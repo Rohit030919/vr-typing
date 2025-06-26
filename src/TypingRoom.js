@@ -5,7 +5,7 @@ import { io } from 'socket.io-client';
 
 const sampleText = `The quick brown fox jumps over the lazy dog. Typing speed tests help improve accuracy and speed. Just keep practicing every single day to get better at it.`;
 
-const socket = io('http://localhost:3001');
+const socket = io('https://vr-typing-server.onrender.com');
 
 function TypingRoom() {
   const { roomId } = useParams();
