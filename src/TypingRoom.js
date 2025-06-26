@@ -126,16 +126,22 @@ function TypingRoom() {
   };
 
   const handleInput = (e) => {
-    if (!isTypingActive) return;
+  if (!isTypingActive) return;
 
-    const value = e.target.value;
-    setUserInput(value);
-    socket.emit('progress', { roomId, index: value.length });
+  const value = e.target.value;
+  setUserInput(value);
 
-    if (value.length >= sampleText.length) {
-      finishTyping();
-    }
-  };
+  if (currentCharRef.current) {
+    currentCharRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  socket.emit('progress', { roomId, index: value.length });
+
+  if (value.length >= sampleText.length) {
+    finishTyping();
+  }
+};
+
 
   return (
     <div className="app">
