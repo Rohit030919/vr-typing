@@ -81,3 +81,25 @@ body {
   opacity: 0.3;
 }
 
+.room-input {
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  width: 140px;
+}
+
+.join-btn {
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #337ab7;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.join-btn:hover {
+  background-color: #2b6ca3;
+}
+
