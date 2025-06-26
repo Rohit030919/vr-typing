@@ -2,11 +2,16 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import './App.css';
 
 function calculateStats(userInput, sampleText) {
-  const wordsTyped = userInput.trim().split(' ').length;
-  const totalChars = userInput.length;
-  const correctChars = userInput.split('').filter((c, i) => c === sampleText[i]).length;
+  const wordsTyped = userInput.trim().split(/\s+/).filter(Boolean).length;
+  const totalChars = userInput.length || 1; // avoid divide-by-zero
+  const correctChars = userInput
+    .split('')
+    .filter((c, i) => c === sampleText[i])
+    .length;
+
   const accuracy = ((correctChars / totalChars) * 100).toFixed(1);
-  const wpm = Math.round((wordsTyped / 60) * 60);
+  const wpm = Math.round((wordsTyped / 60) * 60); // 60s test
+
   return { wpm, accuracy };
 }
 
@@ -14,14 +19,12 @@ function Result() {
   const navigate = useNavigate();
   const { state } = useLocation();
 
-  if (!state) {
-    return <div className="app">No result found</div>;
-  }
+  if (!state) return <div className="app">No result data found</div>;
 
-  const { userInput, sampleText, opponentIndex } = state;
+  const { userInput, sampleText, opponentIndex = 0 } = state;
   const { wpm, accuracy } = calculateStats(userInput, sampleText);
 
-  const opponentWPM = Math.round((opponentIndex / 5) / 1); // rough estimate
+  const opponentWPM = Math.round((opponentIndex / 5) / 1); // approx for 1 min
 
   const winner =
     wpm > opponentWPM
@@ -34,9 +37,10 @@ function Result() {
     <div className="app">
       <h1>Results</h1>
       <h3>{winner}</h3>
+
       <div style={{ marginTop: '20px', fontSize: '18px' }}>
         <p><strong>Your WPM:</strong> {wpm}</p>
-        <p><strong>Your Accuracy:</strong> {accuracy}%</p>
+        <p><strong>Your Accuracy:</strong> {isNaN(accuracy) ? '0%' : `${accuracy}%`}</p>
         <p><strong>Opponent Progress:</strong> {opponentIndex} characters</p>
         <p><strong>Opponent WPM (approx):</strong> {opponentWPM}</p>
       </div>
