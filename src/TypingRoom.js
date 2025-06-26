@@ -127,28 +127,6 @@ function TypingRoom() {
   };
 
   // Smart auto-scroll: Only scroll when cursor goes out of view
-  useEffect(() => {
-    if (currentCharRef.current && typingBoxRef.current) {
-      const cursorElement = currentCharRef.current;
-      const container = typingBoxRef.current;
-      
-      const cursorRect = cursorElement.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-      
-      // Check if cursor is outside the visible area
-      const isAboveView = cursorRect.top < containerRect.top;
-      const isBelowView = cursorRect.bottom > containerRect.bottom;
-      
-      // Only scroll if cursor is out of view
-      if (isAboveView || isBelowView) {
-        cursorElement.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center',
-          inline: 'nearest'
-        });
-      }
-    }
-  }, [userInput]);
 
   return (
     <div className="app">
