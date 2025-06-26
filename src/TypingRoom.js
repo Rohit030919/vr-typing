@@ -40,7 +40,15 @@ function TypingRoom() {
       setOpponentData(data);
     });
 
+    socket.on('opponent-disconnected', () => {
+      setOpponentData(null);
+    });
+
     return () => {
+      socket.off('both-players-joined');
+      socket.off('opponent-progress');
+      socket.off('opponent-finished');
+      socket.off('opponent-disconnected');
       socket.disconnect();
     };
   }, [roomId, playerName]);
@@ -77,7 +85,6 @@ function TypingRoom() {
     setEndTime(finalEndTime);
     setIsTypingActive(false);
     
-    // Calculate user's stats
     const timeInMinutes = (finalEndTime - startTime) / (1000 * 60);
     const wordsTyped = userInput.trim().split(/\s+/).filter(Boolean).length;
     const userWPM = Math.round(wordsTyped / timeInMinutes);
@@ -97,7 +104,6 @@ function TypingRoom() {
       name: playerName
     };
 
-    // Emit user's final stats
     socket.emit('user-finished', { roomId, userData });
 
     navigate('/results', {
@@ -116,7 +122,6 @@ function TypingRoom() {
     setUserInput(value);
     socket.emit('progress', { roomId, index: value.length });
 
-    // Check if user completed the text
     if (value.length >= sampleText.length) {
       finishTyping();
     }
