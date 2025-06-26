@@ -3,7 +3,7 @@ import './App.css';
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const sampleText = `Typing is an essential digital skill in today's world. Whether you're composing emails, writing code, chatting with friends, or drafting reports, your ability to type quickly and accurately can make a huge difference. Practice and repetition are key to improving your typing skills. Many people underestimate the importance of proper finger placement and posture, but these factors can significantly impact performance. Advanced typists often use all ten fingers and maintain a steady rhythm that reduces fatigue over long sessions. Furthermore, as typing becomes second nature, your mind is freed up to focus on ideas and creativity rather than the mechanics of input. Real-time multiplayer typing challenges can make the learning process more fun and engaging. Competing against friends or random opponents gives you an extra push to beat your own speed and accuracy records. Keep track of your words per minute (WPM) and monitor your progress. With consistent effort, you can type like a pro in no time.`;
+const sampleText = `Typing is an essential digital skill in today's world. Whether you're composing emails, writing code, chatting with friends, or drafting reports, your ability to type quickly and accurately can make a huge difference.`;
 
 const socket = io('https://vr-typing-server.onrender.com');
 
@@ -126,7 +126,8 @@ function TypingRoom() {
     }
   };
 
-  // Remove all auto-scroll logic
+  // Smart auto-scroll: Only scroll when cursor goes out of view
+
 
   return (
     <div className="app">
@@ -160,13 +161,7 @@ function TypingRoom() {
           <div 
             className="typing-box" 
             ref={typingBoxRef}
-            onClick={() => {
-              inputRef.current?.focus();
-              // Prevent any scrolling on click
-              if (typingBoxRef.current) {
-                typingBoxRef.current.scrollTop = 0;
-              }
-            }}
+            onClick={() => inputRef.current.focus()}
           >
             {sampleText.split('').map((char, idx) => {
               let className = '';
@@ -184,6 +179,7 @@ function TypingRoom() {
                 <span
                   key={idx}
                   className={className}
+                  ref={idx === userInput.length ? currentCharRef : null}
                 >
                   {char}
                 </span>
