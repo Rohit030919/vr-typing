@@ -3,7 +3,7 @@ import './App.css';
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const sampleText = `Technology is evolving faster than ever, and with it comes an entirely new way of interacting with the world. From smartphones to self-driving cars, artificial intelligence to quantum computing, the innovations of today were science fiction just a few decades ago. In this ever-changing digital landscape, the ability to adapt is no longer optional—it’s a necessity. Communication, creativity, and critical thinking are now more valuable than raw knowledge, and the skill of typing quickly and accurately is at the core of most modern workflows. Whether you're writing code, composing an email, chatting with a friend, or building your next great idea, your keyboard becomes your connection to progress. As remote work, digital learning, and online collaboration grow, the demand for tech fluency increases. No longer is typing just a skill for office workers—it’s essential for gamers, students, creators, and professionals alike. It’s not just about speed; accuracy and endurance matter just as much. The rhythm of your fingers can reflect the rhythm of your thoughts. Mistakes are normal—what counts is how quickly you recover and keep going. That’s why consistent practice is the secret to growth. Even small improvements each day add up to real mastery. So sit up straight, focus your mind, and take a deep breath. You’re not just pressing keys—you’re translating thoughts into action, ideas into impact. Every keystroke is a step forward. Keep typing, keep improving, and remember: greatness begins with consistency and belief in yourself.`;
+const sampleText = `Typing is an essential digital skill in today’s world. Whether you're composing emails, writing code, chatting with friends, or drafting reports, your ability to type quickly and accurately can make a huge difference. Practice and repetition are key to improving your typing skills. Many people underestimate the importance of proper finger placement and posture, but these factors can significantly impact performance. Advanced typists often use all ten fingers and maintain a steady rhythm that reduces fatigue over long sessions. Furthermore, as typing becomes second nature, your mind is freed up to focus on ideas and creativity rather than the mechanics of input. Real-time multiplayer typing challenges can make the learning process more fun and engaging. Competing against friends or random opponents gives you an extra push to beat your own speed and accuracy records. Keep track of your words per minute (WPM) and monitor your progress. With consistent effort, you can type like a pro in no time.`;
 
 const socket = io('https://vr-typing-server.onrender.com');
 
@@ -20,6 +20,7 @@ function TypingRoom() {
   const [isTypingActive, setIsTypingActive] = useState(false);
   const [timeLeft, setTimeLeft] = useState(60);
   const [startTime, setStartTime] = useState(null);
+  const [endTime, setEndTime] = useState(null);
 
   const inputRef = useRef(null);
   const currentCharRef = useRef(null);
@@ -46,22 +47,9 @@ function TypingRoom() {
     });
 
     return () => {
-      socket.off('both-players-joined');
-      socket.off('opponent-progress');
-      socket.off('opponent-finished');
-      socket.off('opponent-disconnected');
+      socket.disconnect();
     };
   }, [roomId, playerName]);
-
-  useEffect(() => {
-    if (currentCharRef.current) {
-      currentCharRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-        inline: 'nearest',
-      });
-    }
-  }, [userInput]);
 
   const startCountdown = () => {
     let count = 3;
@@ -91,27 +79,27 @@ function TypingRoom() {
   };
 
   const finishTyping = () => {
-    const endTime = Date.now();
+    const finalEndTime = Date.now();
+    setEndTime(finalEndTime);
     setIsTypingActive(false);
 
-    const timeInMinutes = (endTime - startTime) / (1000 * 60);
+    const timeInMinutes = (finalEndTime - startTime) / (1000 * 60);
     const wordsTyped = userInput.trim().split(/\s+/).filter(Boolean).length;
     const userWPM = Math.round(wordsTyped / timeInMinutes);
 
     const attemptedLength = Math.min(userInput.length, sampleText.length);
     const correctChars = userInput
-      .slice(0, attemptedLength)
       .split('')
-      .filter((c, i) => c === sampleText[i]).length;
-
-    const userAccuracy = attemptedLength > 0
-      ? ((correctChars / attemptedLength) * 100).toFixed(1)
-      : 0;
+      .slice(0, attemptedLength)
+      .filter((c, i) => c === sampleText[i])
+      .length;
+    const userAccuracy = attemptedLength > 0 ? 
+      ((correctChars / attemptedLength) * 100).toFixed(1) : 0;
 
     const userData = {
       wpm: userWPM,
       accuracy: parseFloat(userAccuracy),
-      name: playerName,
+      name: playerName
     };
 
     socket.emit('user-finished', { roomId, userData });
@@ -120,28 +108,29 @@ function TypingRoom() {
       state: {
         userStats: userData,
         opponentStats: opponentData,
-        playerName,
+        playerName
       },
     });
   };
 
   const handleInput = (e) => {
-  if (!isTypingActive) return;
+    if (!isTypingActive) return;
 
-  const value = e.target.value;
-  setUserInput(value);
+    const value = e.target.value;
+    setUserInput(value);
+    socket.emit('progress', { roomId, index: value.length });
 
-  if (currentCharRef.current) {
-    currentCharRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
+    if (value.length >= sampleText.length) {
+      finishTyping();
+    }
+  };
 
-  socket.emit('progress', { roomId, index: value.length });
-
-  if (value.length >= sampleText.length) {
-    finishTyping();
-  }
-};
-
+  // Auto-scroll logic (triggered when userInput changes)
+  useEffect(() => {
+    if (currentCharRef.current) {
+      currentCharRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [userInput]);
 
   return (
     <div className="app">
