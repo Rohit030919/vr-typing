@@ -1,53 +1,104 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import './App.css';
 
-function calculateStats(userInput, sampleText) {
-  const wordsTyped = userInput.trim().split(/\s+/).filter(Boolean).length;
-  const totalChars = userInput.length || 1; // avoid divide-by-zero
-  const correctChars = userInput
-    .split('')
-    .filter((c, i) => c === sampleText[i])
-    .length;
-
-  const accuracy = ((correctChars / totalChars) * 100).toFixed(1);
-  const wpm = Math.round((wordsTyped / 60) * 60); // 60s test
-
-  return { wpm, accuracy };
-}
-
 function Result() {
   const navigate = useNavigate();
   const { state } = useLocation();
 
-  if (!state) return <div className="app">No result data found</div>;
+  if (!state) {
+    return (
+      <div className="app">
+        <div className="error-screen">
+          <h2>No result data found</h2>
+          <button onClick={() => navigate('/')} className="create-btn">
+            Go Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  const { userInput, sampleText, opponentIndex = 0 } = state;
-  const { wpm, accuracy } = calculateStats(userInput, sampleText);
+  const { userStats, opponentStats, playerName } = state;
+  
+  // Determine winner
+  let winner = '';
+  let winnerIcon = '';
+  
+  if (!opponentStats) {
+    winner = 'Opponent Left';
+    winnerIcon = '🤷‍♂️';
+  } else if (userStats.wpm > opponentStats.wpm) {
+    winner = 'You Win!';
+    winnerIcon = '🎉';
+  } else if (userStats.wpm < opponentStats.wpm) {
+    winner = 'You Lose';
+    winnerIcon = '😔';
+  } else {
+    winner = "It's a Tie!";
+    winnerIcon = '🤝';
+  }
 
-  const opponentWPM = Math.round((opponentIndex / 5) / 1); // approx for 1 min
-
-  const winner =
-    wpm > opponentWPM
-      ? 'You Win! 🎉'
-      : wpm < opponentWPM
-      ? 'Opponent Wins 😔'
-      : 'It\'s a Tie!';
+  const handlePlayAgain = () => {
+    navigate('/', { state: { playerName } });
+  };
 
   return (
     <div className="app">
-      <h1>Results</h1>
-      <h3>{winner}</h3>
+      <div className="results-container">
+        <div className="results-header">
+          <h1>Results</h1>
+          <div className="winner">
+            <span className="winner-icon">{winnerIcon}</span>
+            <h2>{winner}</h2>
+          </div>
+        </div>
 
-      <div style={{ marginTop: '20px', fontSize: '18px' }}>
-        <p><strong>Your WPM:</strong> {wpm}</p>
-        <p><strong>Your Accuracy:</strong> {isNaN(accuracy) ? '0%' : `${accuracy}%`}</p>
-        <p><strong>Opponent Progress:</strong> {opponentIndex} characters</p>
-        <p><strong>Opponent WPM (approx):</strong> {opponentWPM}</p>
-      </div>
+        <div className="stats-container">
+          <div className="player-stats your-stats">
+            <h3>Your Stats</h3>
+            <div className="stat-item">
+              <span className="stat-label">WPM</span>
+              <span className="stat-value">{userStats.wpm}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">Accuracy</span>
+              <span className="stat-value">{userStats.accuracy}%</span>
+            </div>
+            <div className="player-name">{playerName}</div>
+          </div>
 
-      <div style={{ marginTop: '30px', display: 'flex', gap: '20px' }}>
-        <button onClick={() => navigate('/')} className="create-btn">Exit</button>
-        <button onClick={() => window.location.reload()} className="join-btn">Play Again</button>
+          <div className="vs-divider">VS</div>
+
+          <div className="player-stats opponent-stats">
+            <h3>Opponent Stats</h3>
+            {opponentStats ? (
+              <>
+                <div className="stat-item">
+                  <span className="stat-label">WPM</span>
+                  <span className="stat-value">{opponentStats.wpm}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Accuracy</span>
+                  <span className="stat-value">{opponentStats.accuracy}%</span>
+                </div>
+                <div className="player-name">{opponentStats.name}</div>
+              </>
+            ) : (
+              <div className="opponent-left">
+                <p>Opponent disconnected</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="action-buttons">
+          <button onClick={() => navigate('/')} className="exit-btn">
+            🏠 Exit to Home
+          </button>
+          <button onClick={handlePlayAgain} className="play-again-btn">
+            🎮 Play Again
+          </button>
+        </div>
       </div>
     </div>
   );

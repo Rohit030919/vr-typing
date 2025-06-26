@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import './App.css';
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
@@ -10,31 +10,40 @@ const socket = io('https://vr-typing-server.onrender.com');
 function TypingRoom() {
   const { roomId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [userInput, setUserInput] = useState('');
   const [opponentIndex, setOpponentIndex] = useState(null);
+  const [opponentData, setOpponentData] = useState(null);
   const [isWaiting, setIsWaiting] = useState(true);
   const [countdown, setCountdown] = useState(3);
   const [isTypingActive, setIsTypingActive] = useState(false);
   const [timeLeft, setTimeLeft] = useState(60);
+  const [startTime, setStartTime] = useState(null);
+  const [endTime, setEndTime] = useState(null);
 
   const inputRef = useRef(null);
+  const playerName = location.state?.playerName || 'Anonymous';
 
   useEffect(() => {
-    socket.emit('join-room', roomId);
+    socket.emit('join-room', { roomId, playerName });
 
     socket.on('both-players-joined', () => {
       setIsWaiting(false);
       startCountdown();
     });
 
-    socket.on('opponent-progress', (index) => {
-      setOpponentIndex(index);
+    socket.on('opponent-progress', (data) => {
+      setOpponentIndex(data.index);
+    });
+
+    socket.on('opponent-finished', (data) => {
+      setOpponentData(data);
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [roomId]);
+  }, [roomId, playerName]);
 
   const startCountdown = () => {
     let count = 3;
@@ -44,6 +53,7 @@ function TypingRoom() {
       if (count === 0) {
         clearInterval(countdownInterval);
         setIsTypingActive(true);
+        setStartTime(Date.now());
         inputRef.current?.focus();
         startTimer();
       }
@@ -57,35 +67,90 @@ function TypingRoom() {
       setTimeLeft(time);
       if (time === 0) {
         clearInterval(timer);
-        setIsTypingActive(false);
-        navigate('/results', {
-          state: {
-            userInput,
-            sampleText,
-            opponentIndex,
-          },
-        });
+        finishTyping();
       }
     }, 1000);
   };
 
+  const finishTyping = () => {
+    const finalEndTime = Date.now();
+    setEndTime(finalEndTime);
+    setIsTypingActive(false);
+    
+    // Calculate user's stats
+    const timeInMinutes = (finalEndTime - startTime) / (1000 * 60);
+    const wordsTyped = userInput.trim().split(/\s+/).filter(Boolean).length;
+    const userWPM = Math.round(wordsTyped / timeInMinutes);
+    
+    const attemptedLength = Math.min(userInput.length, sampleText.length);
+    const correctChars = userInput
+      .split('')
+      .slice(0, attemptedLength)
+      .filter((c, i) => c === sampleText[i])
+      .length;
+    const userAccuracy = attemptedLength > 0 ? 
+      ((correctChars / attemptedLength) * 100).toFixed(1) : 0;
+
+    const userData = {
+      wpm: userWPM,
+      accuracy: parseFloat(userAccuracy),
+      name: playerName
+    };
+
+    // Emit user's final stats
+    socket.emit('user-finished', { roomId, userData });
+
+    navigate('/results', {
+      state: {
+        userStats: userData,
+        opponentStats: opponentData,
+        playerName
+      },
+    });
+  };
+
   const handleInput = (e) => {
+    if (!isTypingActive) return;
+    
     const value = e.target.value;
     setUserInput(value);
     socket.emit('progress', { roomId, index: value.length });
+
+    // Check if user completed the text
+    if (value.length >= sampleText.length) {
+      finishTyping();
+    }
   };
 
   return (
     <div className="app">
-      <h2>Room ID: {roomId}</h2>
+      <div className="room-header">
+        <h2>Room: {roomId}</h2>
+        <p>Player: {playerName}</p>
+      </div>
 
       {isWaiting ? (
-        <h3>Waiting for opponent to join...</h3>
-      ) : !isTypingActive ? (
-        <h1>{countdown > 0 ? `Starting in ${countdown}...` : 'GO!'}</h1>
+        <div className="waiting-screen">
+          <div className="spinner"></div>
+          <h3>Waiting for opponent to join...</h3>
+          <p>Share this room code: <strong>{roomId}</strong></p>
+        </div>
+      ) : !isTypingActive && countdown > 0 ? (
+        <div className="countdown-screen">
+          <h1 className="countdown-number">{countdown}</h1>
+          <p>Get ready to type!</p>
+        </div>
+      ) : !isTypingActive && countdown === 0 ? (
+        <div className="countdown-screen">
+          <h1 className="go-text">GO!</h1>
+        </div>
       ) : (
-        <>
-          <h4>Time Left: {timeLeft}s</h4>
+        <div className="typing-section">
+          <div className="game-info">
+            <div className="timer">Time: {timeLeft}s</div>
+            <div className="progress">Progress: {userInput.length}/{sampleText.length}</div>
+          </div>
+          
           <div className="typing-box" onClick={() => inputRef.current.focus()}>
             {sampleText.split('').map((char, idx) => {
               let className = '';
@@ -106,6 +171,7 @@ function TypingRoom() {
               );
             })}
           </div>
+          
           <input
             ref={inputRef}
             type="text"
@@ -118,7 +184,7 @@ function TypingRoom() {
             spellCheck="false"
             disabled={!isTypingActive}
           />
-        </>
+        </div>
       )}
     </div>
   );
