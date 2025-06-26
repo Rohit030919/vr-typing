@@ -3,7 +3,7 @@ import './App.css';
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const sampleText = `Typing is an essential digital skill in today’s world. Whether you're composing emails, writing code, chatting with friends, or drafting reports, your ability to type quickly and accurately can make a huge difference. Practice and repetition are key to improving your typing skills. Many people underestimate the importance of proper finger placement and posture, but these factors can significantly impact performance. Advanced typists often use all ten fingers and maintain a steady rhythm that reduces fatigue over long sessions. Furthermore, as typing becomes second nature, your mind is freed up to focus on ideas and creativity rather than the mechanics of input. Real-time multiplayer typing challenges can make the learning process more fun and engaging. Competing against friends or random opponents gives you an extra push to beat your own speed and accuracy records. Keep track of your words per minute (WPM) and monitor your progress. With consistent effort, you can type like a pro in no time.`;
+const sampleText = `Typing is an essential digital skill in today's world. Whether you're composing emails, writing code, chatting with friends, or drafting reports, your ability to type quickly and accurately can make a huge difference. Practice and repetition are key to improving your typing skills. Many people underestimate the importance of proper finger placement and posture, but these factors can significantly impact performance. Advanced typists often use all ten fingers and maintain a steady rhythm that reduces fatigue over long sessions. Furthermore, as typing becomes second nature, your mind is freed up to focus on ideas and creativity rather than the mechanics of input. Real-time multiplayer typing challenges can make the learning process more fun and engaging. Competing against friends or random opponents gives you an extra push to beat your own speed and accuracy records. Keep track of your words per minute (WPM) and monitor your progress. With consistent effort, you can type like a pro in no time.`;
 
 const socket = io('https://vr-typing-server.onrender.com');
 
@@ -24,6 +24,7 @@ function TypingRoom() {
 
   const inputRef = useRef(null);
   const currentCharRef = useRef(null);
+  const typingBoxRef = useRef(null);
   const playerName = location.state?.playerName || 'Anonymous';
 
   useEffect(() => {
@@ -125,10 +126,27 @@ function TypingRoom() {
     }
   };
 
-  // Auto-scroll logic (triggered when userInput changes)
+  // Smart auto-scroll: Only scroll when cursor goes out of view
   useEffect(() => {
-    if (currentCharRef.current) {
-      currentCharRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (currentCharRef.current && typingBoxRef.current) {
+      const cursorElement = currentCharRef.current;
+      const container = typingBoxRef.current;
+      
+      const cursorRect = cursorElement.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      
+      // Check if cursor is outside the visible area
+      const isAboveView = cursorRect.top < containerRect.top;
+      const isBelowView = cursorRect.bottom > containerRect.bottom;
+      
+      // Only scroll if cursor is out of view
+      if (isAboveView || isBelowView) {
+        cursorElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
     }
   }, [userInput]);
 
@@ -161,7 +179,11 @@ function TypingRoom() {
             <div className="progress">Progress: {userInput.length}/{sampleText.length}</div>
           </div>
 
-          <div className="typing-box" onClick={() => inputRef.current.focus()}>
+          <div 
+            className="typing-box" 
+            ref={typingBoxRef}
+            onClick={() => inputRef.current.focus()}
+          >
             {sampleText.split('').map((char, idx) => {
               let className = '';
               if (idx < userInput.length) {
