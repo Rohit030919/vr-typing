@@ -49,7 +49,7 @@ function TypingRoom() {
       socket.off('opponent-progress');
       socket.off('opponent-finished');
       socket.off('opponent-disconnected');
-      socket.disconnect();
+      
     };
   }, [roomId, playerName]);
 
