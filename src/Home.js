@@ -71,7 +71,7 @@ function Home() {
                   type="text"
                   placeholder="Enter room code"
                   value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  onChange={(e) => setJoinCode(e.target.value)}
                   className="room-input"
                   maxLength={6}
                 />
