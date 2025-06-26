@@ -502,8 +502,9 @@ body {
   .typing-box {
     font-size: 18px;
     padding: 20px;
-    height: 330px; /* or any height you prefer */
+    height: 330px;
     overflow-y: auto;
-  }
+    /* Remove this line: scroll-behavior: smooth; */
+}
 }
 

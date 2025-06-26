@@ -126,7 +126,7 @@ function TypingRoom() {
     }
   };
 
-  // Smart auto-scroll: Only scroll when cursor goes out of view
+  // Remove all auto-scroll logic
 
   return (
     <div className="app">
@@ -160,7 +160,13 @@ function TypingRoom() {
           <div 
             className="typing-box" 
             ref={typingBoxRef}
-            onClick={() => inputRef.current.focus()}
+            onClick={() => {
+              inputRef.current?.focus();
+              // Prevent any scrolling on click
+              if (typingBoxRef.current) {
+                typingBoxRef.current.scrollTop = 0;
+              }
+            }}
           >
             {sampleText.split('').map((char, idx) => {
               let className = '';
@@ -178,7 +184,6 @@ function TypingRoom() {
                 <span
                   key={idx}
                   className={className}
-                  ref={idx === userInput.length ? currentCharRef : null}
                 >
                   {char}
                 </span>
