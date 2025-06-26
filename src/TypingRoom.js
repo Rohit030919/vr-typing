@@ -11,6 +11,7 @@ function TypingRoom() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+
   const [userInput, setUserInput] = useState('');
   const [opponentIndex, setOpponentIndex] = useState(null);
   const [opponentData, setOpponentData] = useState(null);
@@ -19,9 +20,9 @@ function TypingRoom() {
   const [isTypingActive, setIsTypingActive] = useState(false);
   const [timeLeft, setTimeLeft] = useState(60);
   const [startTime, setStartTime] = useState(null);
-  const [endTime, setEndTime] = useState(null);
 
   const inputRef = useRef(null);
+  const currentCharRef = useRef(null);
   const playerName = location.state?.playerName || 'Anonymous';
 
   useEffect(() => {
@@ -49,9 +50,18 @@ function TypingRoom() {
       socket.off('opponent-progress');
       socket.off('opponent-finished');
       socket.off('opponent-disconnected');
-      
     };
   }, [roomId, playerName]);
+
+  useEffect(() => {
+    if (currentCharRef.current) {
+      currentCharRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest',
+      });
+    }
+  }, [userInput]);
 
   const startCountdown = () => {
     let count = 3;
@@ -81,27 +91,27 @@ function TypingRoom() {
   };
 
   const finishTyping = () => {
-    const finalEndTime = Date.now();
-    setEndTime(finalEndTime);
+    const endTime = Date.now();
     setIsTypingActive(false);
-    
-    const timeInMinutes = (finalEndTime - startTime) / (1000 * 60);
+
+    const timeInMinutes = (endTime - startTime) / (1000 * 60);
     const wordsTyped = userInput.trim().split(/\s+/).filter(Boolean).length;
     const userWPM = Math.round(wordsTyped / timeInMinutes);
-    
+
     const attemptedLength = Math.min(userInput.length, sampleText.length);
     const correctChars = userInput
-      .split('')
       .slice(0, attemptedLength)
-      .filter((c, i) => c === sampleText[i])
-      .length;
-    const userAccuracy = attemptedLength > 0 ? 
-      ((correctChars / attemptedLength) * 100).toFixed(1) : 0;
+      .split('')
+      .filter((c, i) => c === sampleText[i]).length;
+
+    const userAccuracy = attemptedLength > 0
+      ? ((correctChars / attemptedLength) * 100).toFixed(1)
+      : 0;
 
     const userData = {
       wpm: userWPM,
       accuracy: parseFloat(userAccuracy),
-      name: playerName
+      name: playerName,
     };
 
     socket.emit('user-finished', { roomId, userData });
@@ -110,14 +120,14 @@ function TypingRoom() {
       state: {
         userStats: userData,
         opponentStats: opponentData,
-        playerName
+        playerName,
       },
     });
   };
 
   const handleInput = (e) => {
     if (!isTypingActive) return;
-    
+
     const value = e.target.value;
     setUserInput(value);
     socket.emit('progress', { roomId, index: value.length });
@@ -155,7 +165,7 @@ function TypingRoom() {
             <div className="timer">Time: {timeLeft}s</div>
             <div className="progress">Progress: {userInput.length}/{sampleText.length}</div>
           </div>
-          
+
           <div className="typing-box" onClick={() => inputRef.current.focus()}>
             {sampleText.split('').map((char, idx) => {
               let className = '';
@@ -170,13 +180,17 @@ function TypingRoom() {
               }
 
               return (
-                <span key={idx} className={className}>
+                <span
+                  key={idx}
+                  className={className}
+                  ref={idx === userInput.length ? currentCharRef : null}
+                >
                   {char}
                 </span>
               );
             })}
           </div>
-          
+
           <input
             ref={inputRef}
             type="text"
