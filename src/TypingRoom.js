@@ -91,30 +91,33 @@ function TypingRoom() {
 
   const finishTyping = () => {
     const finalEndTime = Date.now();
-    setEndTime(finalEndTime);
-    setIsTypingActive(false);
+    const timeElapsedInSeconds = (finalEndTime - startTime) / 1000;
     
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+    // Minimum test time of 5 seconds to prevent false results
+    if (timeElapsedInSeconds < 5) {
+      alert('Test too short! Minimum 5 seconds required');
+      return;
     }
 
-    const timeElapsedInMinutes = (finalEndTime - startTime) / (1000 * 60);
+    const timeElapsedInMinutes = timeElapsedInSeconds / 60;
     const attemptedLength = Math.min(userInput.length, sampleText.length);
-    const correctChars = userInput
-      .split('')
-      .slice(0, attemptedLength)
-      .filter((c, i) => c === sampleText[i])
-      .length;
     
-    const userWPM = Math.round((correctChars / 5) / timeElapsedInMinutes);
-    const userAccuracy = attemptedLength > 0 ? 
-      Math.round((correctChars / attemptedLength) * 100) : 0;
+    // Count correct characters (ignores extra typed characters)
+    const correctChars = Array.from(userInput)
+      .slice(0, attemptedLength)
+      .reduce((acc, char, i) => char === sampleText[i] ? acc + 1 : acc, 0);
+
+    // Standard WPM calculation (5 chars = 1 word)
+    const userWPM = Math.max(0, Math.round((correctChars / 5) / timeElapsedInMinutes));
+    const userAccuracy = attemptedLength > 0 
+      ? Math.max(0, Math.min(100, Math.round((correctChars / attemptedLength) * 100)))
+      : 0;
 
     const userData = {
       wpm: userWPM,
       accuracy: userAccuracy,
-      name: playerName
+      name: playerName,
+      socketId: socket.id // Add socket ID for tracking
     };
 
     setFinalStats({
@@ -123,7 +126,13 @@ function TypingRoom() {
     });
     setShowResults(true);
 
-    socket.emit('user-finished', { roomId, userData });
+    // Only emit if we have valid results
+    if (userWPM > 0) {
+      socket.emit('user-finished', { 
+        roomId, 
+        userData 
+      });
+    }
   };
 
   const handleInput = (e) => {
