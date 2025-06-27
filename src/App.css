@@ -249,7 +249,7 @@ body {
 .typing-box {
   margin: 30px auto;
   max-width: 800px;
-  height: 150px;                /* Fixed height */
+  height: 200px;                /* Fixed height */
   overflow-y: auto;             /* Scrollable */
   padding: 30px;
   border: 2px solid rgba(255, 255, 255, 0.1);
