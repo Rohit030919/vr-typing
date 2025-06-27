@@ -3,7 +3,7 @@ import './App.css';
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const sampleText = `Technology is evolving faster than ever, and with it comes an entirely new way of interacting with the world. From smartphones to self-driving cars, artificial intelligence to quantum computing, the innovations of today were science fiction just a few decades ago. In this ever-changing digital landscape, the ability to adapt is no longer optional—it's a necessity. Communication, creativity, and critical thinking are now more valuable than raw knowledge, and the skill of typing quickly and accurately is at the core of most modern workflows. Whether you're writing code, composing an email, chatting with a friend, or building your next great idea, your keyboard becomes your connection to progress. As remote work, digital learning, and online collaboration grow, the demand for tech fluency increases. No longer is typing just a skill for office workers—it's essential for gamers, students, creators, and professionals alike. It's not just about speed; accuracy and endurance matter just as much. The rhythm of your fingers can reflect the rhythm of your thoughts. Mistakes are normal—what counts is how quickly you recover and keep going. That's why consistent practice is the secret to growth. Even small improvements each day add up to real mastery. So sit up straight, focus your mind, and take a deep breath. You're not just pressing keys—you're translating thoughts into action, ideas into impact. Every keystroke is a step forward. Keep typing, keep improving, and remember: greatness begins with consistency and belief in yourself.`;
+const sampleText = `Technology is evolving faster than ever...`; // Keep your sample text
 
 const socket = io('https://vr-typing-server.onrender.com');
 
@@ -44,6 +44,7 @@ function TypingRoom() {
     });
 
     socket.on('opponent-finished', (data) => {
+      console.log('Received opponent data:', data);
       setOpponentData(data);
     });
 
@@ -92,47 +93,36 @@ function TypingRoom() {
   const finishTyping = () => {
     const finalEndTime = Date.now();
     const timeElapsedInSeconds = (finalEndTime - startTime) / 1000;
-    
-    // Minimum test time of 5 seconds to prevent false results
-    if (timeElapsedInSeconds < 5) {
-      alert('Test too short! Minimum 5 seconds required');
-      return;
-    }
-
     const timeElapsedInMinutes = timeElapsedInSeconds / 60;
-    const attemptedLength = Math.min(userInput.length, sampleText.length);
     
-    // Count correct characters (ignores extra typed characters)
-    const correctChars = Array.from(userInput)
+    const attemptedLength = Math.min(userInput.length, sampleText.length);
+    const correctChars = [...userInput]
       .slice(0, attemptedLength)
-      .reduce((acc, char, i) => char === sampleText[i] ? acc + 1 : acc, 0);
+      .filter((char, i) => char === sampleText[i])
+      .length;
 
-    // Standard WPM calculation (5 chars = 1 word)
-    const userWPM = Math.max(0, Math.round((correctChars / 5) / timeElapsedInMinutes));
-    const userAccuracy = attemptedLength > 0 
-      ? Math.max(0, Math.min(100, Math.round((correctChars / attemptedLength) * 100)))
-      : 0;
+    const userWPM = Math.round((correctChars / 5) / timeElapsedInMinutes);
+    const userAccuracy = Math.round((correctChars / attemptedLength) * 100);
 
     const userData = {
-      wpm: userWPM,
-      accuracy: userAccuracy,
-      name: playerName,
-      socketId: socket.id // Add socket ID for tracking
+      wpm: userWPM || 0,
+      accuracy: userAccuracy || 0,
+      name: playerName
     };
 
+    console.log('User results:', userData); // Debug log
+
+    // Set both user and opponent stats together
     setFinalStats({
       userStats: userData,
       opponentStats: opponentData
     });
+
+    // Show results after setting the stats
     setShowResults(true);
 
-    // Only emit if we have valid results
-    if (userWPM > 0) {
-      socket.emit('user-finished', { 
-        roomId, 
-        userData 
-      });
-    }
+    // Send results to opponent
+    socket.emit('user-finished', { roomId, userData });
   };
 
   const handleInput = (e) => {
@@ -151,10 +141,7 @@ function TypingRoom() {
       const boxScrollTop = typingBoxRef.current.scrollTop;
       const boxHeight = typingBoxRef.current.clientHeight;
 
-      if (
-        cursorOffsetTop < boxScrollTop || 
-        cursorOffsetTop >= boxScrollTop + boxHeight
-      ) {
+      if (cursorOffsetTop < boxScrollTop || cursorOffsetTop >= boxScrollTop + boxHeight) {
         typingBoxRef.current.scrollTop = cursorOffsetTop - boxHeight / 2;
       }
     }
@@ -174,9 +161,7 @@ function TypingRoom() {
     setFinalStats(null);
     
     const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-    navigate(`/room/${newRoomId}`, { 
-      state: { playerName } 
-    });
+    navigate(`/room/${newRoomId}`, { state: { playerName } });
   };
 
   const handleRematch = () => {
@@ -196,7 +181,7 @@ function TypingRoom() {
   };
 
   const determineWinner = () => {
-    if (!finalStats.opponentStats) {
+    if (!finalStats?.opponentStats) {
       return { winner: 'Opponent Left', icon: '🤷‍♂️' };
     }
     if (finalStats.userStats.wpm > finalStats.opponentStats.wpm) {
@@ -211,7 +196,7 @@ function TypingRoom() {
   return (
     <div className="app">
       {/* Results Popup */}
-      {showResults && (
+      {showResults && finalStats && (
         <div className="results-popup">
           <div className="results-content">
             <h2>Game Results</h2>
@@ -255,7 +240,7 @@ function TypingRoom() {
         </div>
       )}
 
-      {/* Rest of your existing JSX remains the same */}
+      {/* Game UI */}
       <div className="room-header">
         <h2>Room: {roomId}</h2>
         <p>Player: {playerName}</p>
