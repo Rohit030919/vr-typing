@@ -3,7 +3,7 @@ import './App.css';
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const sampleText = `Technology is evolving faster than ever, and with it comes an entirely new way of interacting with the world. From smartphones to self-driving cars, artificial intelligence to quantum computing, the innovations of today were science fiction just a few decades ago. In this ever-changing digital landscape, the ability to adapt is no longer optional—it’s a necessity. Communication, creativity, and critical thinking are now more valuable than raw knowledge, and the skill of typing quickly and accurately is at the core of most modern workflows. Whether you're writing code, composing an email, chatting with a friend, or building your next great idea, your keyboard becomes your connection to progress. As remote work, digital learning, and online collaboration grow, the demand for tech fluency increases. No longer is typing just a skill for office workers—it’s essential for gamers, students, creators, and professionals alike. It’s not just about speed; accuracy and endurance matter just as much. The rhythm of your fingers can reflect the rhythm of your thoughts. Mistakes are normal—what counts is how quickly you recover and keep going. That’s why consistent practice is the secret to growth. Even small improvements each day add up to real mastery. So sit up straight, focus your mind, and take a deep breath. You’re not just pressing keys—you’re translating thoughts into action, ideas into impact. Every keystroke is a step forward. Keep typing, keep improving, and remember: greatness begins with consistency and belief in yourself.`;
+const sampleText = `Technology is evolving faster than ever, and with it comes an entirely new way of interacting with the world. From smartphones to self-driving cars, artificial intelligence to quantum computing, the innovations of today were science fiction just a few decades ago. In this ever-changing digital landscape, the ability to adapt is no longer optional—it's a necessity. Communication, creativity, and critical thinking are now more valuable than raw knowledge, and the skill of typing quickly and accurately is at the core of most modern workflows. Whether you're writing code, composing an email, chatting with a friend, or building your next great idea, your keyboard becomes your connection to progress. As remote work, digital learning, and online collaboration grow, the demand for tech fluency increases. No longer is typing just a skill for office workers—it's essential for gamers, students, creators, and professionals alike. It's not just about speed; accuracy and endurance matter just as much. The rhythm of your fingers can reflect the rhythm of your thoughts. Mistakes are normal—what counts is how quickly you recover and keep going. That's why consistent practice is the secret to growth. Even small improvements each day add up to real mastery. So sit up straight, focus your mind, and take a deep breath. You're not just pressing keys—you're translating thoughts into action, ideas into impact. Every keystroke is a step forward. Keep typing, keep improving, and remember: greatness begins with consistency and belief in yourself.`;
 
 const socket = io('https://vr-typing-server.onrender.com');
 
@@ -25,6 +25,9 @@ function TypingRoom() {
   const inputRef = useRef(null);
   const currentCharRef = useRef(null);
   const typingBoxRef = useRef(null);
+  const timerRef = useRef(null); // Add timer ref for cleanup
+  const countdownRef = useRef(null); // Add countdown ref for cleanup
+  
   const playerName = location.state?.playerName || 'Anonymous';
 
   useEffect(() => {
@@ -48,17 +51,22 @@ function TypingRoom() {
     });
 
     return () => {
+      // Clean up timers and socket
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
       socket.disconnect();
     };
   }, [roomId, playerName]);
 
   const startCountdown = () => {
     let count = 3;
-    const countdownInterval = setInterval(() => {
+    setCountdown(count);
+    
+    countdownRef.current = setInterval(() => {
       count--;
       setCountdown(count);
       if (count === 0) {
-        clearInterval(countdownInterval);
+        clearInterval(countdownRef.current);
         setIsTypingActive(true);
         setStartTime(Date.now());
         inputRef.current?.focus();
@@ -69,11 +77,13 @@ function TypingRoom() {
 
   const startTimer = () => {
     let time = 60;
-    const timer = setInterval(() => {
+    setTimeLeft(time);
+    
+    timerRef.current = setInterval(() => {
       time--;
       setTimeLeft(time);
       if (time === 0) {
-        clearInterval(timer);
+        clearInterval(timerRef.current);
         finishTyping();
       }
     }, 1000);
@@ -83,25 +93,40 @@ function TypingRoom() {
     const finalEndTime = Date.now();
     setEndTime(finalEndTime);
     setIsTypingActive(false);
+    
+    // Clear timer to prevent "opponent disconnected"
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
 
-    const timeInMinutes = (finalEndTime - startTime) / (1000 * 60);
-    const wordsTyped = userInput.trim().split(/\s+/).filter(Boolean).length;
-    const userWPM = Math.round(wordsTyped / timeInMinutes);
+    // Calculate actual time elapsed in minutes
+    const timeElapsedInMinutes = (finalEndTime - startTime) / (1000 * 60);
+    
+    // Calculate words typed (split by spaces and filter empty)
+    const wordsTyped = userInput.trim().split(/\s+/).filter(word => word.length > 0).length;
+    
+    // Calculate WPM based on actual time elapsed
+    const userWPM = timeElapsedInMinutes > 0 ? Math.round(wordsTyped / timeElapsedInMinutes) : 0;
 
+    // Calculate accuracy
     const attemptedLength = Math.min(userInput.length, sampleText.length);
     const correctChars = userInput
       .split('')
       .slice(0, attemptedLength)
       .filter((c, i) => c === sampleText[i])
       .length;
+    
     const userAccuracy = attemptedLength > 0 ? 
-      ((correctChars / attemptedLength) * 100).toFixed(1) : 0;
+      Math.round((correctChars / attemptedLength) * 100) : 0;
 
     const userData = {
       wpm: userWPM,
-      accuracy: parseFloat(userAccuracy),
+      accuracy: userAccuracy,
       name: playerName
     };
+
+    console.log('User stats:', userData); // Debug log
 
     socket.emit('user-finished', { roomId, userData });
 
@@ -109,40 +134,37 @@ function TypingRoom() {
       state: {
         userStats: userData,
         opponentStats: opponentData,
-        playerName
+        playerName,
+        roomId // Pass roomId for play again
       },
     });
   };
 
   const handleInput = (e) => {
-  if (!isTypingActive) return;
+    if (!isTypingActive) return;
 
-  const value = e.target.value;
-  setUserInput(value);
-  socket.emit('progress', { roomId, index: value.length });
+    const value = e.target.value;
+    setUserInput(value);
+    socket.emit('progress', { roomId, index: value.length });
 
-  if (value.length >= sampleText.length) {
-    finishTyping();
-  }
-
-  // Smart scroll to keep current character in view
-  if (currentCharRef.current && typingBoxRef.current) {
-    const cursorOffsetTop = currentCharRef.current.offsetTop;
-    const boxScrollTop = typingBoxRef.current.scrollTop;
-    const boxHeight = typingBoxRef.current.clientHeight;
-
-    if (
-      cursorOffsetTop < boxScrollTop || 
-      cursorOffsetTop >= boxScrollTop + boxHeight
-    ) {
-      typingBoxRef.current.scrollTop = cursorOffsetTop - boxHeight / 2;
+    if (value.length >= sampleText.length) {
+      finishTyping();
     }
-  }
-};
 
+    // Smart scroll to keep current character in view
+    if (currentCharRef.current && typingBoxRef.current) {
+      const cursorOffsetTop = currentCharRef.current.offsetTop;
+      const boxScrollTop = typingBoxRef.current.scrollTop;
+      const boxHeight = typingBoxRef.current.clientHeight;
 
-  // Smart auto-scroll: Only scroll when cursor goes out of view
-
+      if (
+        cursorOffsetTop < boxScrollTop || 
+        cursorOffsetTop >= boxScrollTop + boxHeight
+      ) {
+        typingBoxRef.current.scrollTop = cursorOffsetTop - boxHeight / 2;
+      }
+    }
+  };
 
   return (
     <div className="app">
@@ -176,7 +198,7 @@ function TypingRoom() {
           <div 
             className="typing-box" 
             ref={typingBoxRef}
-            onClick={() => inputRef.current.focus()}
+            onClick={() => inputRef.current?.focus()}
           >
             {sampleText.split('').map((char, idx) => {
               let className = '';

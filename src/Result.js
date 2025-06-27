@@ -18,7 +18,7 @@ function Result() {
     );
   }
 
-  const { userStats, opponentStats, playerName } = state;
+  const { userStats, opponentStats, playerName, roomId } = state;
   
   // Determine winner
   let winner = '';
@@ -39,7 +39,22 @@ function Result() {
   }
 
   const handlePlayAgain = () => {
-    navigate('/', { state: { playerName } });
+    // Generate new room ID for new game
+    const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    navigate(`/room/${newRoomId}`, { 
+      state: { playerName }
+    });
+  };
+
+  const handleRematch = () => {
+    // Use same room ID for rematch (if both players want to play again)
+    if (roomId) {
+      navigate(`/room/${roomId}`, { 
+        state: { playerName }
+      });
+    } else {
+      handlePlayAgain(); // Fallback to new room
+    }
   };
 
   return (
@@ -58,11 +73,11 @@ function Result() {
             <h3>Your Stats</h3>
             <div className="stat-item">
               <span className="stat-label">WPM</span>
-              <span className="stat-value">{userStats.wpm}</span>
+              <span className="stat-value">{userStats?.wpm || 0}</span>
             </div>
             <div className="stat-item">
               <span className="stat-label">Accuracy</span>
-              <span className="stat-value">{userStats.accuracy}%</span>
+              <span className="stat-value">{userStats?.accuracy || 0}%</span>
             </div>
             <div className="player-name">{playerName}</div>
           </div>
@@ -75,11 +90,11 @@ function Result() {
               <>
                 <div className="stat-item">
                   <span className="stat-label">WPM</span>
-                  <span className="stat-value">{opponentStats.wpm}</span>
+                  <span className="stat-value">{opponentStats.wpm || 0}</span>
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Accuracy</span>
-                  <span className="stat-value">{opponentStats.accuracy}%</span>
+                  <span className="stat-value">{opponentStats.accuracy || 0}%</span>
                 </div>
                 <div className="player-name">{opponentStats.name}</div>
               </>
@@ -95,8 +110,13 @@ function Result() {
           <button onClick={() => navigate('/')} className="exit-btn">
             🏠 Exit to Home
           </button>
+          {opponentStats && (
+            <button onClick={handleRematch} className="play-again-btn">
+              🔄 Rematch
+            </button>
+          )}
           <button onClick={handlePlayAgain} className="play-again-btn">
-            🎮 Play Again
+            🎮 New Game
           </button>
         </div>
       </div>
