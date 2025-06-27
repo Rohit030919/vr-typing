@@ -90,55 +90,65 @@ function TypingRoom() {
   };
 
   const finishTyping = () => {
-    const finalEndTime = Date.now();
-    setEndTime(finalEndTime);
-    setIsTypingActive(false);
-    
-    // Clear timer to prevent "opponent disconnected"
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+  const finalEndTime = Date.now();
+  setEndTime(finalEndTime);
+  setIsTypingActive(false);
+  
+  // Clear timer to prevent "opponent disconnected"
+  if (timerRef.current) {
+    clearInterval(timerRef.current);
+    timerRef.current = null;
+  }
 
-    // Calculate actual time elapsed in minutes
-    const timeElapsedInMinutes = (finalEndTime - startTime) / (1000 * 60);
-    
-    // Calculate words typed (split by spaces and filter empty)
-    const wordsTyped = userInput.trim().split(/\s+/).filter(word => word.length > 0).length;
-    
-    // Calculate WPM based on actual time elapsed
-    const userWPM = timeElapsedInMinutes > 0 ? Math.round(wordsTyped / timeElapsedInMinutes) : 0;
+  // Calculate actual time elapsed in seconds, then convert to minutes
+  const timeElapsedInSeconds = (finalEndTime - startTime) / 1000;
+  const timeElapsedInMinutes = timeElapsedInSeconds / 60;
 
-    // Calculate accuracy
-    const attemptedLength = Math.min(userInput.length, sampleText.length);
-    const correctChars = userInput
-      .split('')
-      .slice(0, attemptedLength)
-      .filter((c, i) => c === sampleText[i])
-      .length;
-    
-    const userAccuracy = attemptedLength > 0 ? 
-      Math.round((correctChars / attemptedLength) * 100) : 0;
+  // Standard WPM calculation: (correct characters / 5) / minutes
+  const attemptedLength = Math.min(userInput.length, sampleText.length);
+  
+  // Count correct characters
+  const correctChars = userInput
+    .split('')
+    .slice(0, attemptedLength)
+    .filter((c, i) => c === sampleText[i])
+    .length;
 
-    const userData = {
-      wpm: userWPM,
-      accuracy: userAccuracy,
-      name: playerName
-    };
+  // Calculate WPM (5 characters = 1 "word")
+  const userWPM = timeElapsedInMinutes > 0 
+    ? Math.round((correctChars / 5) / timeElapsedInMinutes)
+    : 0;
 
-    console.log('User stats:', userData); // Debug log
+  // Calculate accuracy
+  const userAccuracy = attemptedLength > 0 
+    ? Math.round((correctChars / attemptedLength) * 100)
+    : 0;
 
-    socket.emit('user-finished', { roomId, userData });
-
-    navigate('/results', {
-      state: {
-        userStats: userData,
-        opponentStats: opponentData,
-        playerName,
-        roomId // Pass roomId for play again
-      },
-    });
+  const userData = {
+    wpm: userWPM,
+    accuracy: userAccuracy,
+    name: playerName
   };
+
+  console.log('User stats:', {
+    correctChars,
+    attemptedLength,
+    timeElapsedInMinutes,
+    wpm: userWPM,
+    accuracy: userAccuracy
+  });
+
+  socket.emit('user-finished', { roomId, userData });
+
+  navigate('/results', {
+    state: {
+      userStats: userData,
+      opponentStats: opponentData,
+      playerName,
+      roomId
+    },
+  });
+};
 
   const handleInput = (e) => {
     if (!isTypingActive) return;
