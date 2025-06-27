@@ -249,6 +249,8 @@ body {
 .typing-box {
   margin: 30px auto;
   max-width: 800px;
+  height: 150px;                /* Fixed height */
+  overflow-y: auto;             /* Scrollable */
   padding: 30px;
   border: 2px solid rgba(255, 255, 255, 0.1);
   background: rgba(0, 0, 0, 0.3);
@@ -258,7 +260,9 @@ body {
   cursor: text;
   user-select: none;
   backdrop-filter: blur(10px);
+  scroll-behavior: smooth;      /* Smooth scroll on updates */
 }
+
 
 .typing-box span {
   opacity: 0.4;
@@ -504,7 +508,6 @@ body {
     padding: 20px;
     height: 330px;
     overflow-y: auto;
-    /* Remove this line: scroll-behavior: smooth; */
-}
+   }
 }
 

@@ -115,16 +115,31 @@ function TypingRoom() {
   };
 
   const handleInput = (e) => {
-    if (!isTypingActive) return;
+  if (!isTypingActive) return;
 
-    const value = e.target.value;
-    setUserInput(value);
-    socket.emit('progress', { roomId, index: value.length });
+  const value = e.target.value;
+  setUserInput(value);
+  socket.emit('progress', { roomId, index: value.length });
 
-    if (value.length >= sampleText.length) {
-      finishTyping();
+  if (value.length >= sampleText.length) {
+    finishTyping();
+  }
+
+  // Smart scroll to keep current character in view
+  if (currentCharRef.current && typingBoxRef.current) {
+    const cursorOffsetTop = currentCharRef.current.offsetTop;
+    const boxScrollTop = typingBoxRef.current.scrollTop;
+    const boxHeight = typingBoxRef.current.clientHeight;
+
+    if (
+      cursorOffsetTop < boxScrollTop || 
+      cursorOffsetTop >= boxScrollTop + boxHeight
+    ) {
+      typingBoxRef.current.scrollTop = cursorOffsetTop - boxHeight / 2;
     }
-  };
+  }
+};
+
 
   // Smart auto-scroll: Only scroll when cursor goes out of view
 
