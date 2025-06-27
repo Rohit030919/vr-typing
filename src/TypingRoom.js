@@ -11,7 +11,6 @@ function TypingRoom() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-
   const [userInput, setUserInput] = useState('');
   const [opponentIndex, setOpponentIndex] = useState(null);
   const [opponentData, setOpponentData] = useState(null);
@@ -21,12 +20,14 @@ function TypingRoom() {
   const [timeLeft, setTimeLeft] = useState(60);
   const [startTime, setStartTime] = useState(null);
   const [endTime, setEndTime] = useState(null);
+  const [showResults, setShowResults] = useState(false);
+  const [finalStats, setFinalStats] = useState(null);
 
   const inputRef = useRef(null);
   const currentCharRef = useRef(null);
   const typingBoxRef = useRef(null);
-  const timerRef = useRef(null); // Add timer ref for cleanup
-  const countdownRef = useRef(null); // Add countdown ref for cleanup
+  const timerRef = useRef(null);
+  const countdownRef = useRef(null);
   
   const playerName = location.state?.playerName || 'Anonymous';
 
@@ -51,7 +52,6 @@ function TypingRoom() {
     });
 
     return () => {
-      // Clean up timers and socket
       if (timerRef.current) clearInterval(timerRef.current);
       if (countdownRef.current) clearInterval(countdownRef.current);
       socket.disconnect();
@@ -90,65 +90,41 @@ function TypingRoom() {
   };
 
   const finishTyping = () => {
-  const finalEndTime = Date.now();
-  setEndTime(finalEndTime);
-  setIsTypingActive(false);
-  
-  // Clear timer to prevent "opponent disconnected"
-  if (timerRef.current) {
-    clearInterval(timerRef.current);
-    timerRef.current = null;
-  }
+    const finalEndTime = Date.now();
+    setEndTime(finalEndTime);
+    setIsTypingActive(false);
+    
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
 
-  // Calculate actual time elapsed in seconds, then convert to minutes
-  const timeElapsedInSeconds = (finalEndTime - startTime) / 1000;
-  const timeElapsedInMinutes = timeElapsedInSeconds / 60;
+    const timeElapsedInMinutes = (finalEndTime - startTime) / (1000 * 60);
+    const attemptedLength = Math.min(userInput.length, sampleText.length);
+    const correctChars = userInput
+      .split('')
+      .slice(0, attemptedLength)
+      .filter((c, i) => c === sampleText[i])
+      .length;
+    
+    const userWPM = Math.round((correctChars / 5) / timeElapsedInMinutes);
+    const userAccuracy = attemptedLength > 0 ? 
+      Math.round((correctChars / attemptedLength) * 100) : 0;
 
-  // Standard WPM calculation: (correct characters / 5) / minutes
-  const attemptedLength = Math.min(userInput.length, sampleText.length);
-  
-  // Count correct characters
-  const correctChars = userInput
-    .split('')
-    .slice(0, attemptedLength)
-    .filter((c, i) => c === sampleText[i])
-    .length;
+    const userData = {
+      wpm: userWPM,
+      accuracy: userAccuracy,
+      name: playerName
+    };
 
-  // Calculate WPM (5 characters = 1 "word")
-  const userWPM = timeElapsedInMinutes > 0 
-    ? Math.round((correctChars / 5) / timeElapsedInMinutes)
-    : 0;
-
-  // Calculate accuracy
-  const userAccuracy = attemptedLength > 0 
-    ? Math.round((correctChars / attemptedLength) * 100)
-    : 0;
-
-  const userData = {
-    wpm: userWPM,
-    accuracy: userAccuracy,
-    name: playerName
-  };
-
-  console.log('User stats:', {
-    correctChars,
-    attemptedLength,
-    timeElapsedInMinutes,
-    wpm: userWPM,
-    accuracy: userAccuracy
-  });
-
-  socket.emit('user-finished', { roomId, userData });
-
-  navigate('/results', {
-    state: {
+    setFinalStats({
       userStats: userData,
-      opponentStats: opponentData,
-      playerName,
-      roomId
-    },
-  });
-};
+      opponentStats: opponentData
+    });
+    setShowResults(true);
+
+    socket.emit('user-finished', { roomId, userData });
+  };
 
   const handleInput = (e) => {
     if (!isTypingActive) return;
@@ -161,7 +137,6 @@ function TypingRoom() {
       finishTyping();
     }
 
-    // Smart scroll to keep current character in view
     if (currentCharRef.current && typingBoxRef.current) {
       const cursorOffsetTop = currentCharRef.current.offsetTop;
       const boxScrollTop = typingBoxRef.current.scrollTop;
@@ -176,8 +151,102 @@ function TypingRoom() {
     }
   };
 
+  const handlePlayAgain = () => {
+    setUserInput('');
+    setOpponentIndex(null);
+    setOpponentData(null);
+    setIsWaiting(true);
+    setCountdown(3);
+    setIsTypingActive(false);
+    setTimeLeft(60);
+    setStartTime(null);
+    setEndTime(null);
+    setShowResults(false);
+    setFinalStats(null);
+    
+    const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    navigate(`/room/${newRoomId}`, { 
+      state: { playerName } 
+    });
+  };
+
+  const handleRematch = () => {
+    setUserInput('');
+    setOpponentIndex(null);
+    setOpponentData(null);
+    setIsWaiting(true);
+    setCountdown(3);
+    setIsTypingActive(false);
+    setTimeLeft(60);
+    setStartTime(null);
+    setEndTime(null);
+    setShowResults(false);
+    setFinalStats(null);
+    
+    socket.emit('join-room', { roomId, playerName });
+  };
+
+  const determineWinner = () => {
+    if (!finalStats.opponentStats) {
+      return { winner: 'Opponent Left', icon: '🤷‍♂️' };
+    }
+    if (finalStats.userStats.wpm > finalStats.opponentStats.wpm) {
+      return { winner: 'You Win!', icon: '🎉' };
+    }
+    if (finalStats.userStats.wpm < finalStats.opponentStats.wpm) {
+      return { winner: 'You Lose', icon: '😔' };
+    }
+    return { winner: "It's a Tie!", icon: '🤝' };
+  };
+
   return (
     <div className="app">
+      {/* Results Popup */}
+      {showResults && (
+        <div className="results-popup">
+          <div className="results-content">
+            <h2>Game Results</h2>
+            
+            <div className="winner-display">
+              <span className="winner-icon">{determineWinner().icon}</span>
+              <h3>{determineWinner().winner}</h3>
+            </div>
+
+            <div className="stats-grid">
+              <div className="player-stats">
+                <h4>You</h4>
+                <p>WPM: {finalStats.userStats.wpm}</p>
+                <p>Accuracy: {finalStats.userStats.accuracy}%</p>
+              </div>
+              
+              <div className="vs">VS</div>
+              
+              <div className="opponent-stats">
+                <h4>Opponent</h4>
+                {finalStats.opponentStats ? (
+                  <>
+                    <p>WPM: {finalStats.opponentStats.wpm}</p>
+                    <p>Accuracy: {finalStats.opponentStats.accuracy}%</p>
+                  </>
+                ) : (
+                  <p>Disconnected</p>
+                )}
+              </div>
+            </div>
+
+            <div className="action-buttons">
+              <button onClick={handleRematch} className="rematch-btn">
+                🔄 Rematch
+              </button>
+              <button onClick={handlePlayAgain} className="new-game-btn">
+                🎮 New Game
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rest of your existing JSX remains the same */}
       <div className="room-header">
         <h2>Room: {roomId}</h2>
         <p>Player: {playerName}</p>
@@ -204,7 +273,7 @@ function TypingRoom() {
             <div className="timer">Time: {timeLeft}s</div>
             <div className="progress">Progress: {userInput.length}/{sampleText.length}</div>
           </div>
-
+          
           <div 
             className="typing-box" 
             ref={typingBoxRef}
@@ -233,7 +302,7 @@ function TypingRoom() {
               );
             })}
           </div>
-
+          
           <input
             ref={inputRef}
             type="text"
